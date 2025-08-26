@@ -1,5 +1,7 @@
 import streamlit as st
 import requests
+import pandas as pd
+import plotly.graph_objects as go
 
 # Use your deployed backend URL from Render
 API_URL = "https://personal-expense-tracker.onrender.com"
@@ -47,15 +49,45 @@ else:
     st.header("💵 Monthly Budget")
     new_budget = st.number_input("Set Monthly Budget", min_value=0.0, value=st.session_state.monthly_budget)
     if st.button("Update Budget"):
-        res = requests.post(f"{API_URL}/set_budget/{st.session_state.user_id}", json={"monthly_budget": new_budget})
+        res = requests.post(
+            f"{API_URL}/set_budget/{st.session_state.user_id}",
+            json={"monthly_budget": new_budget}
+        )
         if res.status_code == 200:
             st.session_state.monthly_budget = new_budget
             st.success(f"Budget updated to ${new_budget}")
+        else:
+            st.error("Failed to update budget")
 
     if st.button("Track Budget"):
         res = requests.get(f"{API_URL}/track_budget/{st.session_state.user_id}")
         if res.status_code == 200:
-            st.json(res.json())
+            data = res.json()
+            total_spent = data["total_spent"]
+            budget = data["monthly_budget"]
+
+            # Gauge chart
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number+delta",
+                value=total_spent,
+                title={'text': "Spending Progress"},
+                delta={'reference': budget},
+                gauge={
+                    'axis': {'range': [0, max(budget, total_spent*1.2)]},
+                    'bar': {'color': "red"},
+                    'steps': [
+                        {'range': [0, budget], 'color': "lightgreen"},
+                        {'range': [budget, max(budget, total_spent*1.2)], 'color': "pink"}
+                    ],
+                    'threshold': {
+                        'line': {'color': "black", 'width': 4},
+                        'thickness': 0.75,
+                        'value': budget
+                    }
+                }
+            ))
+
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.error("Error tracking budget")
 
@@ -85,7 +117,24 @@ else:
         if res.status_code == 200:
             expenses = res.json()
             if expenses:
-                st.table(expenses)
+                df = pd.DataFrame(expenses)
+
+                # Drop internal DB fields
+                if "id" in df: df.drop(columns=["id"], inplace=True)
+                if "user_id" in df: df.drop(columns=["user_id"], inplace=True)
+
+                # Format currency
+                df["amount"] = df["amount"].map("${:,.2f}".format)
+
+                st.subheader("📊 My Expenses")
+                st.dataframe(df, use_container_width=True)
+
+                # Totals
+                total_spent = sum(
+                    float(str(e["amount"]).replace("$", "").replace(",", "")) 
+                    for e in expenses
+                )
+                st.write(f"**Total Spent:** ${total_spent:.2f}")
             else:
                 st.info("No expenses recorded yet.")
         else:

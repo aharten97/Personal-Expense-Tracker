@@ -6,3 +6,5 @@ requests
 sqlalchemy
 psycopg2-binary
 passlib[bcrypt]
+pandas
+plotly
