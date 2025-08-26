@@ -1,7 +1,6 @@
-###Personal Expense Tracker Project
+### PERSONAL EXPENSE TRACKER ###
 
 ## 1. ADD AN EXPENSE
-
 
 #create an empty list
 
@@ -166,4 +165,5 @@ while True :
     print("Goodbye!")
     break
   else :
+
     print("Invalid choice. Please enter a number between 1 and 5.\n")
