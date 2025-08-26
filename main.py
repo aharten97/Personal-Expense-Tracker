@@ -6,10 +6,10 @@ import csv
 
 app = FastAPI()
 
-# global list to hold expenses
+# Global list to hold expenses (like your original)
 v_total_expenses = []
 
-# schema for validating expenses
+# Schema for validating expenses
 class Expense(BaseModel):
     date: str
     category: str
@@ -19,14 +19,20 @@ class Expense(BaseModel):
 # 1. ADD AN EXPENSE
 @app.post("/add_expense")
 def add_expense(expense: Expense):
-    v_total_expenses.append(expense.dict())
-    return {"message": "Expense added", "expense": expense.dict()}
+    v_expense = {
+        "date": expense.date,
+        "category": expense.category,
+        "amount": expense.amount,
+        "description": expense.description
+    }
+    v_total_expenses.append(v_expense)
+    return {"message": "Expense added successfully", "expense": v_expense}
 
 # 2. VIEW LIST OF EXPENSES
 @app.get("/view_expenses")
 def view_expenses():
     if not v_total_expenses:
-        return {"message": "No expenses recorded yet."}
+        return {"message": "No expenses have been recorded yet."}
     return {"expenses": v_total_expenses}
 
 # 3. SET AND TRACK THE BUDGET
@@ -40,7 +46,7 @@ def track_budget(monthly_budget: float):
     if v_total_spent > monthly_budget:
         result["status"] = "You have exceeded your budget!"
     else:
-        result["status"] = f"You have ${round(monthly_budget - v_total_spent, 2)} left."
+        result["status"] = f"You have ${round(monthly_budget - v_total_spent, 2)} left for the month."
     return result
 
 # 4. SAVE EXPENSES TO CSV
@@ -52,3 +58,6 @@ def save_expenses():
         for i in v_total_expenses:
             writer.writerow([i["date"], i["category"], i["amount"], i["description"]])
     return {"message": "Expenses saved to file."}
+@app.get("/")
+def home():
+    return {"message": "Welcome to the Personal Expense Tracker API. Visit /docs for the interactive UI."}
