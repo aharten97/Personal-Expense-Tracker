@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 # Use your deployed backend URL from Render
-API_URL = "https://personal-expense-tracker.onrender.com"
+API_URL = "https://personal-expense-tracker-1-vub6.onrender.com"
 
 st.set_page_config(page_title="Personal Expense Tracker", page_icon="💰", layout="centered")
 st.title("💰 Personal Expense Tracker")
