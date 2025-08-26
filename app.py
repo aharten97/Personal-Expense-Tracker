@@ -1,168 +1,153 @@
-import streamlit as st
-import requests
-import pandas as pd
-import plotly.graph_objects as go
+from fastapi import FastAPI, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, Integer, String, Float
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from passlib.context import CryptContext
+import os
 
-# Use your deployed backend URL from Render
-API_URL = "https://personal-expense-tracker-1-vub6.onrender.com"
+# Database setup (Render provides DATABASE_URL, fallback is SQLite for local testing)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
-st.set_page_config(page_title="Personal Expense Tracker", page_icon="💰", layout="centered")
-st.title("💰 Personal Expense Tracker")
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-# ---------------------------
-# Login / Register
-# ---------------------------
-if "user_id" not in st.session_state:
-    st.subheader("Login or Register")
+app = FastAPI()
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("Register"):
-            res = requests.post(f"{API_URL}/register", json={"username": username, "password": password})
-            if res.status_code == 200:
-                st.success("User registered! Now log in.")
-            else:
-                try:
-                    st.error(res.json().get("detail", "Registration failed"))
-                except:
-                    st.error(f"Registration failed: {res.text}")
-
-    with col2:
-        if st.button("Login"):
-            res = requests.post(f"{API_URL}/login", json={"username": username, "password": password})
-            if res.status_code == 200 and "user_id" in res.json():
-                st.session_state.user_id = res.json()["user_id"]
-                st.session_state.username = username
-                st.session_state.monthly_budget = res.json().get("monthly_budget", 0.0)
-                st.success(f"Welcome back, {username}!")
-            else:
-                st.error("Invalid login")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ---------------------------
-# If logged in → Show Tracker
+# Database Models
 # ---------------------------
-else:
-    st.success(f"Logged in as {st.session_state.username}")
+class UserDB(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    monthly_budget = Column(Float, default=0.0)
 
-    # --- Budget Section ---
-    st.header("💵 Monthly Budget")
+class ExpenseDB(Base):
+    __tablename__ = "expenses"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    date = Column(String)
+    category = Column(String)
+    amount = Column(Float)
+    description = Column(String)
 
-    # Use text input so typing works smoothly
-    budget_input = st.text_input("Set Monthly Budget", value=f"{st.session_state.monthly_budget:.2f}")
+Base.metadata.create_all(bind=engine)
+
+# ---------------------------
+# Pydantic Schemas
+# ---------------------------
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class BudgetUpdate(BaseModel):
+    monthly_budget: float
+
+class Expense(BaseModel):
+    user_id: int
+    date: str
+    category: str
+    amount: float
+    description: str
+
+# ---------------------------
+# Dependency
+# ---------------------------
+def get_db():
+    db = SessionLocal()
     try:
-        new_budget = round(float(budget_input), 2) if budget_input else 0.0
-    except ValueError:
-        new_budget = 0.0
-        st.warning("Please enter a valid number for the budget.")
+        yield db
+    finally:
+        db.close()
 
-    if st.button("Update Budget"):
-        res = requests.post(
-            f"{API_URL}/set_budget/{st.session_state.user_id}",
-            json={"monthly_budget": new_budget}
-        )
-        if res.status_code == 200:
-            st.session_state.monthly_budget = new_budget
-            st.success(f"Budget updated to ${new_budget:.2f}")
-        else:
-            try:
-                st.error(res.json().get("detail", f"Failed to update budget: {res.text}"))
-            except:
-                st.error(f"Failed to update budget: {res.text}")
+# ---------------------------
+# Authentication Endpoints
+# ---------------------------
+@app.post("/register")
+def register(user: UserCreate, db: Session = Depends(get_db)):
+    existing = db.query(UserDB).filter(UserDB.username == user.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    hashed_pw = pwd_context.hash(user.password)
+    db_user = UserDB(username=user.username, hashed_password=hashed_pw)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return {"message": "User registered successfully", "user_id": db_user.id}
 
-    if st.button("Track Budget"):
-        res = requests.get(f"{API_URL}/track_budget/{st.session_state.user_id}")
-        if res.status_code == 200:
-            data = res.json()
+@app.post("/login")
+def login(user: UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(UserDB).filter(UserDB.username == user.username).first()
+    if not db_user or not pwd_context.verify(user.password, db_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    return {
+        "message": "Login successful",
+        "user_id": db_user.id,
+        "monthly_budget": db_user.monthly_budget
+    }
 
-            total_spent = round(data["total_spent"], 2)
-            budget = round(data["monthly_budget"], 2)
+# ---------------------------
+# Budget Management
+# ---------------------------
+@app.post("/set_budget/{user_id}")
+def set_budget(user_id: int, budget: BudgetUpdate, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.monthly_budget = budget.monthly_budget
+    db.commit()
+    return {"message": "Budget updated", "monthly_budget": user.monthly_budget}
 
-            # Gauge chart with $ labels
-            fig = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=total_spent,
-                title={'text': "Spending Progress"},
-                number={'prefix': "$", 'valueformat': ".2f"},
-                delta={'reference': budget, 'relative': False, 'valueformat': ".2f", 'prefix': "$"},
-                gauge={
-                    'axis': {'range': [0, max(budget, total_spent * 1.2)]},
-                    'bar': {'color': "red"},
-                    'steps': [
-                        {'range': [0, budget], 'color': "lightgreen"},
-                        {'range': [budget, max(budget, total_spent * 1.2)], 'color': "pink"}
-                    ],
-                    'threshold': {
-                        'line': {'color': "black", 'width': 4},
-                        'thickness': 0.75,
-                        'value': budget
-                    }
-                }
-            ))
+@app.get("/track_budget/{user_id}")
+def track_budget(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    total_spent = sum(e.amount for e in db.query(ExpenseDB).filter(ExpenseDB.user_id == user_id).all())
+    remaining = user.monthly_budget - total_spent
+    return {
+        "total_spent": round(total_spent, 2),
+        "monthly_budget": user.monthly_budget,
+        "remaining": round(remaining, 2),
+        "status": "Over budget!" if remaining < 0 else "Within budget"
+    }
 
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.error(f"Error tracking budget: {res.text}")
+# ---------------------------
+# Expense Management
+# ---------------------------
+@app.post("/add_expense")
+def add_expense(expense: Expense, db: Session = Depends(get_db)):
+    db_expense = ExpenseDB(**expense.dict())
+    db.add(db_expense)
+    db.commit()
+    db.refresh(db_expense)
+    return {"message": "Expense added", "expense_id": db_expense.id}
 
-    # --- Expense Section ---
-    st.header("🧾 Add Expense")
-    date = st.date_input("Date")
-    category = st.text_input("Category")
+@app.get("/view_expenses/{user_id}")
+def view_expenses(user_id: int, db: Session = Depends(get_db)):
+    return db.query(ExpenseDB).filter(ExpenseDB.user_id == user_id).all()
 
-    # Fix typing issue for expense amount
-    amount_input = st.text_input("Amount", value="0.00")
-    try:
-        amount = round(float(amount_input), 2) if amount_input else 0.0
-    except ValueError:
-        amount = 0.0
-        st.warning("Please enter a valid number for the expense amount.")
+@app.delete("/delete_expense/{expense_id}")
+def delete_expense(expense_id: int, db: Session = Depends(get_db)):
+    expense = db.query(ExpenseDB).filter(ExpenseDB.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    db.delete(expense)
+    db.commit()
+    return {"message": f"Expense with ID {expense_id} deleted successfully"}
 
-    description = st.text_area("Description")
-
-    if st.button("Add Expense"):
-        payload = {
-            "user_id": st.session_state.user_id,
-            "date": str(date),
-            "category": category,
-            "amount": amount,
-            "description": description
-        }
-        res = requests.post(f"{API_URL}/add_expense", json=payload)
-        if res.status_code == 200:
-            st.success("Expense added!")
-        else:
-            st.error(f"Failed to add expense: {res.text}")
-
-    if st.button("View My Expenses"):
-        res = requests.get(f"{API_URL}/view_expenses/{st.session_state.user_id}")
-        if res.status_code == 200:
-            expenses = res.json()
-            if expenses:
-                df = pd.DataFrame(expenses)
-
-                # Drop DB internal fields
-                if "id" in df: df.drop(columns=["id"], inplace=True)
-                if "user_id" in df: df.drop(columns=["user_id"], inplace=True)
-
-                # ✅ Calculate total before formatting
-                total_spent = round(df["amount"].astype(float).sum(), 2)
-
-                # Format amount column AFTER total is calculated
-                df["amount"] = df["amount"].map(lambda x: f"${float(x):,.2f}")
-
-                st.subheader("📊 My Expenses")
-                st.dataframe(df, use_container_width=True)
-
-                st.write(f"**Total Spent:** ${total_spent:.2f}")
-            else:
-                st.info("No expenses recorded yet.")
-        else:
-            st.error(f"Error loading expenses: {res.text}")
-
-    # --- Logout ---
-    if st.button("Logout"):
-        st.session_state.clear()
-        st.success("Logged out!")
+# ---------------------------
+# Home
+# ---------------------------
+@app.get("/")
+def home():
+    return {"message": "Welcome to the Personal Expense Tracker API with Users and Budgets. Visit /docs for the interactive UI."}
