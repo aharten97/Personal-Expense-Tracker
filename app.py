@@ -50,16 +50,23 @@ else:
 
     # --- Budget Section ---
     st.header("💵 Monthly Budget")
-    new_budget = st.number_input("Set Monthly Budget", min_value=0.0, value=st.session_state.monthly_budget)
+
+    # Use text input so typing works smoothly
+    budget_input = st.text_input("Set Monthly Budget", value=f"{st.session_state.monthly_budget:.2f}")
+    try:
+        new_budget = round(float(budget_input), 2) if budget_input else 0.0
+    except ValueError:
+        new_budget = 0.0
+        st.warning("Please enter a valid number for the budget.")
 
     if st.button("Update Budget"):
         res = requests.post(
             f"{API_URL}/set_budget/{st.session_state.user_id}",
-            json={"monthly_budget": float(new_budget)}  # ensure it's numeric
+            json={"monthly_budget": new_budget}
         )
         if res.status_code == 200:
             st.session_state.monthly_budget = new_budget
-            st.success(f"Budget updated to ${new_budget}")
+            st.success(f"Budget updated to ${new_budget:.2f}")
         else:
             try:
                 st.error(res.json().get("detail", f"Failed to update budget: {res.text}"))
@@ -71,15 +78,16 @@ else:
         if res.status_code == 200:
             data = res.json()
 
-            total_spent = data["total_spent"]
-            budget = data["monthly_budget"]
+            total_spent = round(data["total_spent"], 2)
+            budget = round(data["monthly_budget"], 2)
 
-            # Gauge chart for budget vs spent
+            # Gauge chart with $ labels
             fig = go.Figure(go.Indicator(
                 mode="gauge+number+delta",
                 value=total_spent,
                 title={'text': "Spending Progress"},
-                delta={'reference': budget},
+                number={'prefix': "$", 'valueformat': ".2f"},
+                delta={'reference': budget, 'relative': False, 'valueformat': ".2f", 'prefix': "$"},
                 gauge={
                     'axis': {'range': [0, max(budget, total_spent * 1.2)]},
                     'bar': {'color': "red"},
@@ -103,7 +111,15 @@ else:
     st.header("🧾 Add Expense")
     date = st.date_input("Date")
     category = st.text_input("Category")
-    amount = st.number_input("Amount", min_value=0.0)
+
+    # Fix typing issue for expense amount
+    amount_input = st.text_input("Amount", value="0.00")
+    try:
+        amount = round(float(amount_input), 2) if amount_input else 0.0
+    except ValueError:
+        amount = 0.0
+        st.warning("Please enter a valid number for the expense amount.")
+
     description = st.text_area("Description")
 
     if st.button("Add Expense"):
@@ -132,16 +148,13 @@ else:
                 if "user_id" in df: df.drop(columns=["user_id"], inplace=True)
 
                 # Format currency
-                df["amount"] = df["amount"].map("${:,.2f}".format)
+                df["amount"] = df["amount"].map(lambda x: f"${float(x):,.2f}")
 
                 st.subheader("📊 My Expenses")
                 st.dataframe(df, use_container_width=True)
 
                 # Totals
-                total_spent = sum(
-                    float(str(e["amount"]).replace("$", "").replace(",", "")) 
-                    for e in expenses
-                )
+                total_spent = round(sum(float(e["amount"]) for e in df.to_dict("records")), 2)
                 st.write(f"**Total Spent:** ${total_spent:.2f}")
             else:
                 st.info("No expenses recorded yet.")
