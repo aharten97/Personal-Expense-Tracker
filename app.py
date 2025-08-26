@@ -26,7 +26,10 @@ if "user_id" not in st.session_state:
             if res.status_code == 200:
                 st.success("User registered! Now log in.")
             else:
-                st.error(res.json().get("detail", "Registration failed"))
+                try:
+                    st.error(res.json().get("detail", "Registration failed"))
+                except:
+                    st.error(f"Registration failed: {res.text}")
 
     with col2:
         if st.button("Login"):
@@ -48,36 +51,41 @@ else:
     # --- Budget Section ---
     st.header("💵 Monthly Budget")
     new_budget = st.number_input("Set Monthly Budget", min_value=0.0, value=st.session_state.monthly_budget)
+
     if st.button("Update Budget"):
         res = requests.post(
             f"{API_URL}/set_budget/{st.session_state.user_id}",
-            json={"monthly_budget": new_budget}
+            json={"monthly_budget": float(new_budget)}  # ensure it's numeric
         )
         if res.status_code == 200:
             st.session_state.monthly_budget = new_budget
             st.success(f"Budget updated to ${new_budget}")
         else:
-            st.error("Failed to update budget")
+            try:
+                st.error(res.json().get("detail", f"Failed to update budget: {res.text}"))
+            except:
+                st.error(f"Failed to update budget: {res.text}")
 
     if st.button("Track Budget"):
         res = requests.get(f"{API_URL}/track_budget/{st.session_state.user_id}")
         if res.status_code == 200:
             data = res.json()
+
             total_spent = data["total_spent"]
             budget = data["monthly_budget"]
 
-            # Gauge chart
+            # Gauge chart for budget vs spent
             fig = go.Figure(go.Indicator(
                 mode="gauge+number+delta",
                 value=total_spent,
                 title={'text': "Spending Progress"},
                 delta={'reference': budget},
                 gauge={
-                    'axis': {'range': [0, max(budget, total_spent*1.2)]},
+                    'axis': {'range': [0, max(budget, total_spent * 1.2)]},
                     'bar': {'color': "red"},
                     'steps': [
                         {'range': [0, budget], 'color': "lightgreen"},
-                        {'range': [budget, max(budget, total_spent*1.2)], 'color': "pink"}
+                        {'range': [budget, max(budget, total_spent * 1.2)], 'color': "pink"}
                     ],
                     'threshold': {
                         'line': {'color': "black", 'width': 4},
@@ -89,7 +97,7 @@ else:
 
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.error("Error tracking budget")
+            st.error(f"Error tracking budget: {res.text}")
 
     # --- Expense Section ---
     st.header("🧾 Add Expense")
@@ -110,7 +118,7 @@ else:
         if res.status_code == 200:
             st.success("Expense added!")
         else:
-            st.error("Failed to add expense")
+            st.error(f"Failed to add expense: {res.text}")
 
     if st.button("View My Expenses"):
         res = requests.get(f"{API_URL}/view_expenses/{st.session_state.user_id}")
@@ -119,7 +127,7 @@ else:
             if expenses:
                 df = pd.DataFrame(expenses)
 
-                # Drop internal DB fields
+                # Drop DB internal fields
                 if "id" in df: df.drop(columns=["id"], inplace=True)
                 if "user_id" in df: df.drop(columns=["user_id"], inplace=True)
 
@@ -138,7 +146,7 @@ else:
             else:
                 st.info("No expenses recorded yet.")
         else:
-            st.error("Error loading expenses")
+            st.error(f"Error loading expenses: {res.text}")
 
     # --- Logout ---
     if st.button("Logout"):
