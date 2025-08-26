@@ -147,14 +147,15 @@ else:
                 if "id" in df: df.drop(columns=["id"], inplace=True)
                 if "user_id" in df: df.drop(columns=["user_id"], inplace=True)
 
-                # Format currency
+                # ✅ Calculate total before formatting
+                total_spent = round(df["amount"].astype(float).sum(), 2)
+
+                # Format amount column AFTER total is calculated
                 df["amount"] = df["amount"].map(lambda x: f"${float(x):,.2f}")
 
                 st.subheader("📊 My Expenses")
                 st.dataframe(df, use_container_width=True)
 
-                # Totals
-                total_spent = round(sum(float(e["amount"]) for e in df.to_dict("records")), 2)
                 st.write(f"**Total Spent:** ${total_spent:.2f}")
             else:
                 st.info("No expenses recorded yet.")
