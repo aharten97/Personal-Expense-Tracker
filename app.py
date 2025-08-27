@@ -159,7 +159,7 @@ else:
                 st.subheader("📊 My Expenses")
 
                 # ✅ Wider columns so DELETE header doesn't wrap
-                header_cols = st.columns([1, 1, 2, 1, 1, 3])
+                header_cols = st.columns([1, 2, 2, 2, 2, 3])
                 headers = ["ID", "CATEGORY", "DESCRIPTION", "DATE", "AMOUNT", "DELETE"]
                 for col, header in zip(header_cols, headers):
                     col.markdown(f"**{header}**")
