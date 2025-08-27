@@ -167,7 +167,7 @@ else:
 
                     # ✅ Display rows with delete buttons
                     for _, row in df.iterrows():
-                        expense_id = int(row["id"])
+                        expense_id = row.get("id")
                         cols = st.columns([1, 2, 3, 2, 2, 3])
                         cols[0].write(expense_id)
                         cols[1].write(row["category"])
@@ -181,7 +181,7 @@ else:
                     # ✅ Process deletion outside the loop (fixes Streamlit rerun issues)
                     if delete_triggered is not None:
                         try:
-                            del_res = requests.delete(f"{API_URL}/delete_expense/{delete_triggered}")
+                            del_res = requests.delete(f"{API_URL}/delete_expense/{expense_id}")
                             if del_res.status_code == 200:
                                 st.success(f"Deleted expense ID {delete_triggered}")
                                 st.experimental_rerun()  # Refresh after delete
