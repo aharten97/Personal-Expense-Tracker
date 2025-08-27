@@ -71,50 +71,50 @@ else:
             except:
                 st.error(f"Failed to update budget: {res.text}")
 
-if st.button("Track Budget"):
-    res = requests.get(f"{API_URL}/track_budget/{st.session_state.user_id}")
-    if res.status_code == 200:
-        data = res.json()
-        spent = round(data["total_spent"], 2)
-        budget = round(data["monthly_budget"], 2)
-        remaining = round(budget - spent, 2)
+    if st.button("Track Budget"):
+        res = requests.get(f"{API_URL}/track_budget/{st.session_state.user_id}")
+        if res.status_code == 200:
+            data = res.json()
+            spent = round(data["total_spent"], 2)
+            budget = round(data["monthly_budget"], 2)
+            remaining = round(budget - spent, 2)
 
-        # ✅ Proper gauge: Green = remaining, Red = spent
-        fig = go.Figure(go.Indicator(
-            mode="gauge+number+delta",
-            value=remaining,  # ✅ Big white number = Remaining
-            title={'text': "Spending Progress"},
-            number={'prefix': "$", 'valueformat': ".2f",
-                    'font': {'size': 40, 'color': "white"}},
+            # ✅ Proper gauge: Green = remaining, Red = spent
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number+delta",
+                value=remaining,  # ✅ Big white number = Remaining
+                title={'text': "Spending Progress"},
+                number={'prefix': "$", 'valueformat': ".2f",
+                        'font': {'size': 40, 'color': "white"}},
 
-            # ✅ Show spent below in red
-            delta={
-                'reference': 0,
-                'relative': False,
-                'valueformat': ".2f",
-                'prefix': "- $ Spent: ",
-                'increasing': {'color': "red"},
-                'value': spent
-            },
+                # ✅ Show spent below in red
+                delta={
+                    'reference': 0,
+                    'relative': False,
+                    'valueformat': ".2f",
+                    'prefix': "- $ Spent: ",
+                    'increasing': {'color': "red"},
+                    'value': spent
+                },
 
-            gauge={
-                'axis': {'range': [0, max(budget, spent * 1.2)]},
-                'bar': {'color': "white"},  # needle/bar
-                'steps': [
-                    {'range': [0, budget - spent], 'color': "lightgreen"},  # ✅ Remaining = green
-                    {'range': [budget - spent, budget], 'color': "red"}    # ✅ Spent = red
-                ],
-                'threshold': {
-                    'line': {'color': "black", 'width': 4},
-                    'thickness': 0.75,
-                    'value': budget
+                gauge={
+                    'axis': {'range': [0, max(budget, spent * 1.2)]},
+                    'bar': {'color': "white"},  # needle/bar
+                    'steps': [
+                        {'range': [0, remaining], 'color': "lightgreen"},  # ✅ Remaining = green
+                        {'range': [remaining, budget], 'color': "red"}    # ✅ Spent = red
+                    ],
+                    'threshold': {
+                        'line': {'color': "black", 'width': 4},
+                        'thickness': 0.75,
+                        'value': budget
+                    }
                 }
-            }
-        ))
+            ))
 
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.error(f"Error tracking budget: {res.text}")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.error(f"Error tracking budget: {res.text}")
 
     # --- Expense Section ---
     st.header("🧾 Add Expense")
