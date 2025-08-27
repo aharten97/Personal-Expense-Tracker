@@ -101,7 +101,6 @@ else:
                 }
             ))
 
-            fig.update_traces(delta={'reference': 0, 'value': -spent})
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.error(f"Error tracking budget: {res.text}")
