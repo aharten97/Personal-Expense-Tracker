@@ -149,34 +149,44 @@ else:
             if expenses:
                 df = pd.DataFrame(expenses)
 
-                if "user_id" in df: df.drop(columns=["user_id"], inplace=True)
+                if "user_id" in df:
+                    df.drop(columns=["user_id"], inplace=True)
 
                 if "id" not in df:
                     st.warning("Expenses missing ID field, cannot delete rows.")
                 else:
                     st.subheader("📊 My Expenses")
-                    df_display = df.copy()
-                    df_display["amount"] = df_display["amount"].map(lambda x: f"${float(x):,.2f}")
 
-                    # ✅ Uppercase headers
-                    df_display.columns = [col.upper() for col in df_display.columns]
+                    # ✅ Show headers row
+                    header_cols = st.columns([1, 2, 3, 2, 2, 1])
+                    headers = ["ID", "CATEGORY", "DESCRIPTION", "DATE", "AMOUNT", "DELETE"]
+                    for col, header in zip(header_cols, headers):
+                        col.markdown(f"**{header}**")
 
-                    st.dataframe(df_display, use_container_width=True)
+                    # ✅ Display rows with delete buttons
+                    for _, row in df.iterrows():
+                        cols = st.columns([1, 2, 3, 2, 2, 1])
+                        cols[0].write(int(row["id"]))
+                        cols[1].write(row["category"])
+                        cols[2].write(row["description"])
+                        cols[3].write(row["date"])
+                        cols[4].write(f"${float(row['amount']):,.2f}")
 
+                        delete_btn = cols[5].button("🗑️", key=f"del_{row['id']}")
+                        if delete_btn:
+                            try:
+                                del_res = requests.delete(f"{API_URL}/delete_expense/{row['id']}")
+                                if del_res.status_code == 200:
+                                    st.success(f"Deleted expense ID {row['id']}")
+                                    st.experimental_rerun()  # Refresh after delete
+                                else:
+                                    st.error(f"Failed to delete: {del_res.text}")
+                            except Exception as e:
+                                st.error(f"Error deleting: {e}")
+
+                    # ✅ Total Spent
                     total_spent = round(df["amount"].astype(float).sum(), 2)
                     st.write(f"**Total Spent:** ${total_spent:.2f}")
-
-                    delete_id = st.text_input("Enter Expense ID to Delete")
-                    if st.button("Delete Expense"):
-                        try:
-                            res = requests.delete(f"{API_URL}/delete_expense/{delete_id}")
-                            if res.status_code == 200:
-                                st.success("Expense deleted successfully.")
-                            else:
-                                st.error(f"Failed to delete expense: {res.text}")
-                        except Exception as e:
-                            st.error(f"Error deleting expense: {e}")
-
             else:
                 st.info("No expenses recorded yet.")
         else:
