@@ -79,6 +79,7 @@ else:
             budget = round(data["monthly_budget"], 2)
             remaining = round(budget - spent, 2)
 
+            # Gauge chart: White = Remaining, Red = Spent
             fig = go.Figure(go.Indicator(
                 mode="gauge+number+delta",
                 value=remaining,
@@ -100,6 +101,9 @@ else:
                     }
                 }
             ))
+
+            # Force delta to show spent
+            fig.update_traces(delta={'reference': 0, 'value': spent})
 
             st.plotly_chart(fig, use_container_width=True)
         else:
@@ -148,6 +152,10 @@ else:
                     st.subheader("📊 My Expenses")
                     df_display = df.copy()
                     df_display["amount"] = df_display["amount"].map(lambda x: f"${float(x):,.2f}")
+
+                    # ✅ Make headers uppercase
+                    df_display.columns = [col.upper() for col in df_display.columns]
+
                     st.dataframe(df_display, use_container_width=True)
 
                     total_spent = round(df["amount"].astype(float).sum(), 2)
