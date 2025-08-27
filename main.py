@@ -132,7 +132,18 @@ def add_expense(expense: Expense, db: Session = Depends(get_db)):
 
 @app.get("/view_expenses/{user_id}")
 def view_expenses(user_id: int, db: Session = Depends(get_db)):
-    return db.query(ExpenseDB).filter(ExpenseDB.user_id == user_id).all()
+    expenses = db.query(ExpenseDB).filter(ExpenseDB.user_id == user_id).all()
+    return [
+        {
+            "id": e.id,
+            "user_id": e.user_id,
+            "date": e.date,
+            "category": e.category,
+            "amount": e.amount,
+            "description": e.description
+        }
+        for e in expenses
+    ]
 
 # ---------------------------
 # Home
@@ -140,3 +151,4 @@ def view_expenses(user_id: int, db: Session = Depends(get_db)):
 @app.get("/")
 def home():
     return {"message": "Welcome to the Personal Expense Tracker API with Users and Budgets. Visit /docs for the interactive UI."}
+
