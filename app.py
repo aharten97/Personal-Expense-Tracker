@@ -157,33 +157,38 @@ else:
                 else:
                     st.subheader("📊 My Expenses")
 
-                    # ✅ Show headers row
-                    header_cols = st.columns([1, 2, 3, 2, 2, 1])
+                    # ✅ Wider columns so DELETE header doesn't wrap
+                    header_cols = st.columns([1, 2, 3, 2, 2, 2])
                     headers = ["ID", "CATEGORY", "DESCRIPTION", "DATE", "AMOUNT", "DELETE"]
                     for col, header in zip(header_cols, headers):
                         col.markdown(f"**{header}**")
 
+                    delete_triggered = None
+
                     # ✅ Display rows with delete buttons
                     for _, row in df.iterrows():
-                        expense_id = int(row["id"])  # ensure plain int
-                        cols = st.columns([1, 2, 3, 2, 2, 1])
+                        expense_id = int(row["id"])
+                        cols = st.columns([1, 2, 3, 2, 2, 2])
                         cols[0].write(expense_id)
                         cols[1].write(row["category"])
                         cols[2].write(row["description"])
                         cols[3].write(row["date"])
                         cols[4].write(f"${float(row['amount']):,.2f}")
 
-                        delete_btn = cols[5].button("🗑️", key=f"del_{expense_id}")
-                        if delete_btn:
-                            try:
-                                del_res = requests.delete(f"{API_URL}/delete_expense/{expense_id}")
-                                if del_res.status_code == 200:
-                                    st.success(f"Deleted expense ID {expense_id}")
-                                    st.experimental_rerun()  # Refresh after delete
-                                else:
-                                    st.error(f"Failed to delete: {del_res.text}")
-                            except Exception as e:
-                                st.error(f"Error deleting: {e}")
+                        if cols[5].button("🗑️", key=f"del_{expense_id}"):
+                            delete_triggered = expense_id
+
+                    # ✅ Process deletion outside the loop (fixes Streamlit rerun issues)
+                    if delete_triggered is not None:
+                        try:
+                            del_res = requests.delete(f"{API_URL}/delete_expense/{delete_triggered}")
+                            if del_res.status_code == 200:
+                                st.success(f"Deleted expense ID {delete_triggered}")
+                                st.experimental_rerun()  # Refresh after delete
+                            else:
+                                st.error(f"Failed to delete: {del_res.text}")
+                        except Exception as e:
+                            st.error(f"Error deleting: {e}")
 
                     # ✅ Total Spent
                     total_spent = round(df["amount"].astype(float).sum(), 2)
