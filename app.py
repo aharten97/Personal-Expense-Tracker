@@ -165,19 +165,20 @@ else:
 
                     # ✅ Display rows with delete buttons
                     for _, row in df.iterrows():
+                        expense_id = int(row["id"])  # ensure plain int
                         cols = st.columns([1, 2, 3, 2, 2, 1])
-                        cols[0].write(int(row["id"]))
+                        cols[0].write(expense_id)
                         cols[1].write(row["category"])
                         cols[2].write(row["description"])
                         cols[3].write(row["date"])
                         cols[4].write(f"${float(row['amount']):,.2f}")
 
-                        delete_btn = cols[5].button("🗑️", key=f"del_{row['id']}")
+                        delete_btn = cols[5].button("🗑️", key=f"del_{expense_id}")
                         if delete_btn:
                             try:
-                                del_res = requests.delete(f"{API_URL}/delete_expense/{row['id']}")
+                                del_res = requests.delete(f"{API_URL}/delete_expense/{expense_id}")
                                 if del_res.status_code == 200:
-                                    st.success(f"Deleted expense ID {row['id']}")
+                                    st.success(f"Deleted expense ID {expense_id}")
                                     st.experimental_rerun()  # Refresh after delete
                                 else:
                                     st.error(f"Failed to delete: {del_res.text}")
@@ -191,6 +192,7 @@ else:
                 st.info("No expenses recorded yet.")
         else:
             st.error(f"Error loading expenses: {res.text}")
+
 
     # --- Logout ---
     if st.button("Logout"):
