@@ -168,7 +168,7 @@ else:
                     # ✅ Display rows with delete buttons
                     for _, row in df.iterrows():
                         expense_id = int(row["id"])
-                        cols = st.columns([1, 2, 3, 2, 2, 2])
+                        cols = st.columns([1, 2, 3, 2, 2, 3])
                         cols[0].write(expense_id)
                         cols[1].write(row["category"])
                         cols[2].write(row["description"])
