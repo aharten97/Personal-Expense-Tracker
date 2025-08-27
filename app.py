@@ -139,7 +139,7 @@ else:
         res = requests.post(f"{API_URL}/add_expense", json=payload)
         if res.status_code == 200:
             st.success("Expense added!")
-            st.experimental_rerun()  # ✅ refresh the list automatically
+            st.rerun()
         else:
             st.error(f"Failed to add expense: {res.text}")
 
@@ -185,7 +185,7 @@ else:
                         del_res = requests.delete(f"{API_URL}/delete_expense/{delete_triggered}")
                         if del_res.status_code == 200:
                             st.success(f"Deleted expense ID {delete_triggered}")
-                            st.experimental_rerun()  # refresh list automatically
+                            st.rerun()  # refresh list automatically
                         else:
                             st.error(f"Failed to delete: {del_res.text}")
                     except Exception as e:
