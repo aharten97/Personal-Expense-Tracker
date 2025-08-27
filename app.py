@@ -79,30 +79,28 @@ else:
             budget = round(data["monthly_budget"], 2)
             remaining = round(budget - spent, 2)
 
-            # ✅ Proper gauge: Green = remaining, Red = spent
+            # ✅ Gauge chart: Remaining big in white, Spent small in red
             fig = go.Figure(go.Indicator(
                 mode="gauge+number+delta",
-                value=remaining,  # ✅ Big white number = Remaining
+                value=remaining,
                 title={'text': "Spending Progress"},
                 number={'prefix': "$", 'valueformat': ".2f",
                         'font': {'size': 40, 'color': "white"}},
 
-                # ✅ Show spent below in red
                 delta={
-                    'reference': 0,
+                    'reference': budget,
                     'relative': False,
                     'valueformat': ".2f",
-                    'prefix': "- $ Spent: ",
-                    'increasing': {'color': "red"},
-                    'value': spent
+                    'prefix': f"- $ Spent: {spent:.2f} ",
+                    'increasing': {'color': "red"}
                 },
 
                 gauge={
                     'axis': {'range': [0, max(budget, spent * 1.2)]},
-                    'bar': {'color': "white"},  # needle/bar
+                    'bar': {'color': "white"},
                     'steps': [
-                        {'range': [0, remaining], 'color': "lightgreen"},  # ✅ Remaining = green
-                        {'range': [remaining, budget], 'color': "red"}    # ✅ Spent = red
+                        {'range': [0, remaining], 'color': "lightgreen"},
+                        {'range': [remaining, budget], 'color': "red"}
                     ],
                     'threshold': {
                         'line': {'color': "black", 'width': 4},
@@ -160,7 +158,7 @@ else:
                     df_display = df.copy()
                     df_display["amount"] = df_display["amount"].map(lambda x: f"${float(x):,.2f}")
 
-                    # ✅ Make column headers uppercase
+                    # ✅ Uppercase headers
                     df_display.columns = [col.upper() for col in df_display.columns]
 
                     st.dataframe(df_display, use_container_width=True)
