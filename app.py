@@ -139,65 +139,78 @@ else:
         res = requests.post(f"{API_URL}/add_expense", json=payload)
         if res.status_code == 200:
             st.success("Expense added!")
+            # Refresh stored expenses after adding
+            st.session_state.pop("expenses", None)
         else:
             st.error(f"Failed to add expense: {res.text}")
 
-    if st.button("View My Expenses"):
+    # ✅ Load expenses into session state if not already present
+    if "expenses" not in st.session_state:
         res = requests.get(f"{API_URL}/view_expenses/{st.session_state.user_id}")
         if res.status_code == 200:
-            expenses = res.json()
-            if expenses:
-                df = pd.DataFrame(expenses)
-
-                if "user_id" in df:
-                    df.drop(columns=["user_id"], inplace=True)
-
-                if "id" not in df:
-                    st.warning("Expenses missing ID field, cannot delete rows.")
-                else:
-                    st.subheader("📊 My Expenses")
-
-                    # ✅ Wider columns so DELETE header doesn't wrap
-                    header_cols = st.columns([1, 2, 3, 2, 2, 2])
-                    headers = ["ID", "CATEGORY", "DESCRIPTION", "DATE", "AMOUNT", "DELETE"]
-                    for col, header in zip(header_cols, headers):
-                        col.markdown(f"**{header}**")
-
-                    delete_triggered = None
-
-                    # ✅ Display rows with delete buttons
-                    for _, row in df.iterrows():
-                        expense_id = int(row["id"])
-                        cols = st.columns([1, 2, 3, 2, 2, 2])
-                        cols[0].write(expense_id)
-                        cols[1].write(row["category"])
-                        cols[2].write(row["description"])
-                        cols[3].write(row["date"])
-                        cols[4].write(f"${float(row['amount']):,.2f}")
-
-                        if cols[5].button("🗑️", key=f"del_{expense_id}"):
-                            delete_triggered = expense_id
-
-                    # ✅ Process deletion outside the loop (fixes Streamlit rerun issues)
-                    if delete_triggered is not None:
-                        try:
-                            del_res = requests.delete(f"{API_URL}/delete_expense/{delete_triggered}")
-                            if del_res.status_code == 200:
-                                st.success(f"Deleted expense ID {delete_triggered}")
-                                st.experimental_rerun()  # Refresh after delete
-                            else:
-                                st.error(f"Failed to delete: {del_res.text}")
-                        except Exception as e:
-                            st.error(f"Error deleting: {e}")
-
-                    # ✅ Total Spent
-                    total_spent = round(df["amount"].astype(float).sum(), 2)
-                    st.write(f"**Total Spent:** ${total_spent:.2f}")
-            else:
-                st.info("No expenses recorded yet.")
+            st.session_state["expenses"] = res.json()
         else:
             st.error(f"Error loading expenses: {res.text}")
+            st.session_state["expenses"] = []
 
+    expenses = st.session_state["expenses"]
+
+    if expenses:
+        df = pd.DataFrame(expenses)
+
+        if "user_id" in df:
+            df.drop(columns=["user_id"], inplace=True)
+
+        if "id" not in df:
+            st.warning("Expenses missing ID field, cannot delete rows.")
+        else:
+            st.subheader("📊 My Expenses")
+
+            # ✅ Wider columns so DELETE fits
+            header_cols = st.columns([1, 2, 3, 2, 2, 3])
+            headers = ["ID", "CATEGORY", "DESCRIPTION", "DATE", "AMOUNT", "DELETE"]
+            for col, header in zip(header_cols, headers):
+                col.markdown(f"**{header}**")
+
+            updated_expenses = []
+
+            # ✅ Render rows
+            for row in expenses:
+                expense_id = int(row["id"])
+                cols = st.columns([1, 2, 3, 2, 2, 3])
+                cols[0].write(expense_id)
+                cols[1].write(row["category"])
+                cols[2].write(row["description"])
+                cols[3].write(row["date"])
+                cols[4].write(f"${float(row['amount']):,.2f}")
+
+                if cols[5].button("🗑️", key=f"del_{expense_id}"):
+                    try:
+                        del_res = requests.delete(f"{API_URL}/delete_expense/{expense_id}")
+                        if del_res.status_code == 200:
+                            st.success(f"Deleted expense ID {expense_id}")
+                            # ✅ Update local state so row disappears instantly
+                            continue
+                        else:
+                            st.error(f"Failed to delete: {del_res.text}")
+                            updated_expenses.append(row)
+                    except Exception as e:
+                        st.error(f"Error deleting: {e}")
+                        updated_expenses.append(row)
+                else:
+                    updated_expenses.append(row)
+
+            # ✅ Save updated list back into session
+            st.session_state["expenses"] = updated_expenses
+
+            # ✅ Total spent
+            if updated_expenses:
+                total_spent = round(sum(float(exp["amount"]) for exp in updated_expenses), 2)
+                st.write(f"**Total Spent:** ${total_spent:.2f}")
+            else:
+                st.info("All expenses deleted.")
+    else:
+        st.info("No expenses recorded yet.")
 
     # --- Logout ---
     if st.button("Logout"):
