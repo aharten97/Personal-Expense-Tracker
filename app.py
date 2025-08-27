@@ -91,7 +91,7 @@ else:
                     'reference': budget,
                     'relative': False,
                     'valueformat': ".2f",
-                    'prefix': "Spent - $ ",
+                    'prefix': "Spent: $ ",
                     'increasing': {'color': "red"}
                 },
 
