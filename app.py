@@ -13,7 +13,7 @@ st.title("💰 Personal Expense Tracker")
 # Login / Register
 # ---------------------------
 if "user_id" not in st.session_state:
-    st.subheader("Existing User Login or New User Register")
+    st.subheader("Login or Register")
 
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
